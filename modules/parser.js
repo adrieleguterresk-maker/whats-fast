@@ -12,9 +12,10 @@
 import JSZip from 'jszip';
 
 // Regex para parsear linhas do chat do WhatsApp
-// Suporta: DD/MM/YYYY HH:MM ou DD/MM/YYYY HH:MM:SS
-const LINE_REGEX = /^(\d{2}\/\d{2}\/\d{4})\s(\d{2}:\d{2}(?::\d{2})?)\s-\s([^:]+):\s(.+)$/;
-const SYSTEM_LINE_REGEX = /^(\d{2}\/\d{2}\/\d{4})\s(\d{2}:\d{2}(?::\d{2})?)\s-\s(.+)$/;
+// Formato 1: DD/MM/YYYY HH:MM - Nome: msg
+// Formato 2: [DD/MM/YYYY, HH:MM:SS] Nome: msg
+const LINE_REGEX = /^(?:\[?(\d{2}\/\d{2}\/\d{4})[,\s]\s?(\d{2}:\d{2}(?::\d{2})?)\]?\s[-–]?\s?)([^:]+):\s(.+)$/;
+const SYSTEM_LINE_REGEX = /^(?:\[?(\d{2}\/\d{2}\/\d{4})[,\s]\s?(\d{2}:\d{2}(?::\d{2})?)\]?\s[-–]?\s?)(.+)$/;
 
 // Extensões suportadas por tipo
 const AUDIO_EXTENSIONS = ['.opus', '.ogg', '.mp3', '.m4a', '.wav', '.aac', '.amr'];
@@ -54,7 +55,9 @@ function isMediaOmitted(content) {
   return lower.includes('<media omitted>') ||
          lower.includes('<mídia omitida>') ||
          lower.includes('(file attached)') ||
-         lower.includes('(arquivo anexado)');
+         lower.includes('(arquivo anexado)') ||
+         lower.includes('<anexado:') ||
+         lower.includes('<attached:');
 }
 
 /**
@@ -73,12 +76,17 @@ function isDeletedMessage(content) {
  * Verifica se a mensagem referencia um arquivo de mídia específico
  */
 function extractMediaFilename(content) {
-  // Padrões: "PTT-20260303-WA0001.opus (file attached)" ou nome de arquivo
+  // Padrões:
+  // 1. "<anexado: 00000038-AUDIO-2026-03-03-11-15-22.opus>" (WhatsApp PT-BR)
+  // 2. "<attached: filename>" (WhatsApp EN)
+  // 3. "PTT-20260303-WA0001.opus (file attached)"
+  // 4. Nome de arquivo genérico com extensão de mídia
   const patterns = [
+    /<(?:anexado|attached):\s*([\w.-]+\.\w+)>/i,
     /([A-Z]{3}-\d{8}-WA\d{4,}\.\w+)/i,
     /([\w-]+\.(opus|ogg|mp3|m4a|wav|aac|amr|jpg|jpeg|png|webp|gif|mp4|3gp|mkv|avi|mov|pdf|doc|docx|xls|xlsx|ppt|pptx))/i
   ];
-  
+
   for (const pattern of patterns) {
     const match = content.match(pattern);
     if (match) return match[1];
@@ -92,7 +100,9 @@ function extractMediaFilename(content) {
  * @returns {Array} Lista de objetos de mensagem parseados
  */
 export function parseChatText(textContent) {
-  const lines = textContent.split('\n');
+  // Remover caracteres Unicode invisíveis do WhatsApp (LTR mark, zero-width, etc.)
+  const cleanedText = textContent.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a\u202b\u202c\ufeff]/g, '');
+  const lines = cleanedText.split('\n');
   const messages = [];
   let currentMessage = null;
 

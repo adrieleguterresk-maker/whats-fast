@@ -207,14 +207,27 @@ export function renderAgent2Results(conversation) {
 }
 
 /**
+ * Cores por categoria
+ */
+const CATEGORY_COLORS = {
+  'Arquétipo': '#a78bfa',
+  'Preço / Valor': '#34d399',
+  'Prazo / Agenda': '#fbbf24',
+  'Processo / Método': '#60a5fa',
+  'Material / Conteúdo': '#f472b6',
+  'Entrega / Resultado': '#fb923c',
+  'Dúvidas Gerais': '#94a3b8'
+};
+
+/**
  * Renderiza os resultados do Agente 3 (Perguntas e Respostas)
- * @param {Object} result - Output do Agente 3 { qaList, roles, stats }
+ * @param {Object} result - Output do Agente 3 { qaList, roles, stats, categorias }
  */
 export function renderAgent3Results(result) {
   const container = document.getElementById('agent3-results');
   if (!container) return;
 
-  const { qaList, roles, stats } = result;
+  const { qaList, stats, categorias } = result;
 
   if (qaList.length === 0) {
     container.innerHTML = `
@@ -226,34 +239,53 @@ export function renderAgent3Results(result) {
     return;
   }
 
+  // Header com stats
   let html = `
     <div class="results-header">
-      <h3>💬 Perguntas & Respostas Extraídas</h3>
+      <h3>Perguntas & Respostas Extraidas</h3>
       <div class="stats-row">
         <span class="badge badge-question">${stats.totalPerguntas} pergunta(s)</span>
         <span class="badge badge-answer">${stats.comResposta} com resposta</span>
         <span class="badge badge-no-answer">${stats.semResposta} sem resposta</span>
       </div>
     </div>
-    <div class="qa-list">
   `;
+
+  // Sub-abas por categoria
+  const categoryKeys = Object.keys(categorias || {}).sort((a, b) => (categorias[b] || 0) - (categorias[a] || 0));
+
+  html += `<div class="qa-subtabs">`;
+  html += `<button class="qa-subtab active" data-category="todas">Todas (${qaList.length})</button>`;
+  for (const cat of categoryKeys) {
+    const color = CATEGORY_COLORS[cat] || '#94a3b8';
+    html += `<button class="qa-subtab" data-category="${cat}" style="--cat-color: ${color}">${cat} (${categorias[cat]})</button>`;
+  }
+  html += `</div>`;
+
+  // Lista de Q&A
+  html += `<div class="qa-list">`;
 
   for (let i = 0; i < qaList.length; i++) {
     const qa = qaList[i];
     const noAnswer = qa.resposta === '[Sem resposta identificada]';
+    const catColor = CATEGORY_COLORS[qa.categoria] || '#94a3b8';
 
     html += `
-      <div class="qa-card ${noAnswer ? 'qa-no-answer' : ''}">
-        <div class="qa-number">#${i + 1}</div>
+      <div class="qa-card ${noAnswer ? 'qa-no-answer' : ''}" data-category="${qa.categoria}">
+        <div class="qa-card-header">
+          <div class="qa-number">#${i + 1}</div>
+          <span class="qa-category-badge" style="--cat-color: ${catColor}">${qa.categoria}</span>
+        </div>
         <div class="qa-meta">
-          <span class="qa-date">📅 ${qa.data_pergunta} ${qa.hora_pergunta}</span>
+          <span class="qa-date">${qa.data_pergunta} ${qa.hora_pergunta}</span>
+          ${qa.remetente ? `<span class="qa-sender">${escapeHtml(qa.remetente)}</span>` : ''}
         </div>
         <div class="qa-question">
-          <div class="qa-label">❓ Pergunta</div>
+          <div class="qa-label">PERGUNTA</div>
           <div class="qa-text">${escapeHtml(qa.pergunta)}</div>
         </div>
         <div class="qa-answer ${noAnswer ? 'qa-answer-missing' : ''}">
-          <div class="qa-label">💡 Resposta</div>
+          <div class="qa-label">RESPOSTA</div>
           <div class="qa-text">${escapeHtml(qa.resposta)}</div>
         </div>
       </div>
@@ -262,6 +294,26 @@ export function renderAgent3Results(result) {
 
   html += '</div>';
   container.innerHTML = html;
+
+  // Event listeners para sub-abas
+  container.querySelectorAll('.qa-subtab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      // Ativar sub-aba
+      container.querySelectorAll('.qa-subtab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const category = btn.dataset.category;
+      const cards = container.querySelectorAll('.qa-card');
+
+      cards.forEach(card => {
+        if (category === 'todas' || card.dataset.category === category) {
+          card.style.display = '';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    });
+  });
 }
 
 /**

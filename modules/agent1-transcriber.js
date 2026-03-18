@@ -83,12 +83,12 @@ function correlateAudioWithMessages(messages, mediaFiles) {
       m.mediaFilename && m.mediaFilename.toLowerCase() === filename.toLowerCase()
     );
 
-    // Estratégia 2: Match por timestamp no nome do arquivo (PTT-20260303-WA0001)
+    // Estratégia 2: Match por timestamp no nome do arquivo
+    // Suporta: PTT-20260303-WA0001 ou 00000038-AUDIO-2026-03-03-11-15-22
     if (matchIndex === -1) {
-      const dateMatch = filename.match(/(\d{8})/);
+      const dateMatch = filename.match(/(\d{4})-(\d{2})-(\d{2})/) || filename.match(/(\d{4})(\d{2})(\d{2})/);
       if (dateMatch) {
-        const dateStr = dateMatch[1];
-        const formattedDate = `${dateStr.slice(6, 8)}/${dateStr.slice(4, 6)}/${dateStr.slice(0, 4)}`;
+        const formattedDate = `${dateMatch[3]}/${dateMatch[2]}/${dateMatch[1]}`;
         
         const alreadyCorrelated = new Set(correlations.map(c => c.messageIndex));
         const candidates = messages.filter(m =>

@@ -52,7 +52,19 @@ if (!fs.existsSync(tmpDir)) {
  * Header: X-API-Key com a chave da OpenAI
  * Retorna: { transcription: "texto transcrito" }
  */
-app.post('/api/transcribe', upload.single('file'), async (req, res) => {
+app.post('/api/transcribe', async (req, res) => {
+  try {
+    await new Promise((resolve, reject) => {
+      upload.single('file')(req, res, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  } catch (err) {
+    console.error('Erro no upload:', err.message);
+    return res.status(400).json({ error: `Erro no upload: ${err.message}` });
+  }
+
   const apiKey = req.headers['x-api-key'] || process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
@@ -65,6 +77,8 @@ app.post('/api/transcribe', upload.single('file'), async (req, res) => {
     return res.status(400).json({ error: 'Nenhum arquivo de áudio enviado' });
   }
 
+  console.log(`📥 Recebido: ${req.file.originalname} (${(req.file.size / 1024).toFixed(1)} KB)`);
+
   const filePath = req.file.path;
 
   try {
@@ -72,10 +86,14 @@ app.post('/api/transcribe', upload.single('file'), async (req, res) => {
     const FormData = (await import('form-data')).default;
     const formData = new FormData();
 
-    const originalName = req.file.originalname || 'audio.opus';
+    let originalName = req.file.originalname || 'audio.ogg';
+    // Whisper não aceita .opus — renomear para .ogg (mesmo codec, container compatível)
+    if (originalName.endsWith('.opus')) {
+      originalName = originalName.replace(/\.opus$/, '.ogg');
+    }
     formData.append('file', fs.createReadStream(filePath), {
       filename: originalName,
-      contentType: req.file.mimetype || 'audio/ogg'
+      contentType: 'audio/ogg'
     });
     formData.append('model', 'whisper-1');
     formData.append('language', 'pt');
@@ -95,6 +113,7 @@ app.post('/api/transcribe', upload.single('file'), async (req, res) => {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const errorMsg = errorData.error?.message || response.statusText;
+      console.error(`❌ Whisper API erro ${response.status}:`, errorMsg);
 
       if (response.status === 401) {
         return res.status(401).json({ error: 'API Key Inválida', transcription: '[ERRO: API Key Inválida]' });

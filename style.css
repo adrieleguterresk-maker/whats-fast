@@ -921,6 +921,42 @@ body::before {
   word-break: break-word;
 }
 
+/* === Q&A SUB-TABS === */
+.qa-subtabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.qa-subtab {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: inherit;
+}
+
+.qa-subtab:hover {
+  border-color: var(--cat-color, var(--text-secondary));
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.qa-subtab.active {
+  background: var(--cat-color, var(--accent));
+  color: #fff;
+  border-color: var(--cat-color, var(--accent));
+  font-weight: 600;
+}
+
 /* === Q&A CARDS (Agent 3) === */
 .qa-list {
   display: flex;
@@ -948,13 +984,27 @@ body::before {
   border-left: 3px solid var(--error);
 }
 
+.qa-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
 .qa-number {
-  position: absolute;
-  top: var(--space-md);
-  right: var(--space-md);
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-tertiary);
+}
+
+.qa-category-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: var(--cat-color, #94a3b8);
+  color: #fff;
+  letter-spacing: 0.02em;
 }
 
 .qa-meta {

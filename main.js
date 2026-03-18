@@ -31,6 +31,50 @@ let appState = {
   isProcessing: false
 };
 
+// ===== CACHE (localStorage) =====
+const CACHE_PREFIX = 'whatsfast_';
+
+function getCacheKey(file) {
+  return `${CACHE_PREFIX}${file.name}_${file.size}`;
+}
+
+function saveCache(file, stage, data) {
+  try {
+    const key = getCacheKey(file);
+    const cache = JSON.parse(localStorage.getItem(key) || '{}');
+    cache[stage] = data;
+    cache._filename = file.name;
+    cache._timestamp = Date.now();
+    localStorage.setItem(key, JSON.stringify(cache));
+    console.log(`Cache salvo: ${stage} (${file.name})`);
+  } catch (e) {
+    console.warn('Erro ao salvar cache:', e.message);
+  }
+}
+
+function loadCache(file) {
+  try {
+    const key = getCacheKey(file);
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const cache = JSON.parse(raw);
+    console.log(`Cache encontrado para: ${file.name} (salvo em ${new Date(cache._timestamp).toLocaleString()})`);
+    return cache;
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearAllCache() {
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith(CACHE_PREFIX)) keys.push(key);
+  }
+  keys.forEach(k => localStorage.removeItem(k));
+  console.log(`Cache limpo: ${keys.length} entrada(s) removida(s)`);
+}
+
 // ===== DOM ELEMENTS =====
 const uploadZone = document.getElementById('upload-zone');
 const fileInput = document.getElementById('file-input');
@@ -120,7 +164,7 @@ document.getElementById('export-agent3-csv')?.addEventListener('click', () => {
 async function handleFile(file) {
   const validTypes = ['.zip', '.txt'];
   const extension = '.' + file.name.split('.').pop().toLowerCase();
-  
+
   if (!validTypes.includes(extension)) {
     showError('Formato não suportado. Use .zip ou .txt exportado do WhatsApp.');
     return;
@@ -128,7 +172,16 @@ async function handleFile(file) {
 
   uploadZone.classList.add('has-file');
   uploadZone.querySelector('h2').textContent = file.name;
-  uploadZone.querySelector('p').innerHTML = `<strong>${formatSize(file.size)}</strong> — Pronto para processar`;
+
+  // Verificar cache
+  const cache = loadCache(file);
+  const hasFullCache = cache && cache.agent1 && cache.agent2 && cache.agent3;
+
+  if (hasFullCache) {
+    uploadZone.querySelector('p').innerHTML = `<strong>${formatSize(file.size)}</strong> — Cache encontrado!`;
+  } else {
+    uploadZone.querySelector('p').innerHTML = `<strong>${formatSize(file.size)}</strong> — Pronto para processar`;
+  }
 
   try {
     let result;
@@ -140,15 +193,47 @@ async function handleFile(file) {
 
     appState.file = file;
     appState.parseResult = result;
-    
+
     renderUploadSummary(result);
     processBtn.disabled = false;
     processBtn.classList.add('pulse-ready');
-    
+
+    // Se tem cache completo, restaurar resultados automaticamente
+    if (hasFullCache) {
+      restoreFromCache(cache);
+    }
+
   } catch (error) {
     console.error('Erro ao parsear arquivo:', error);
     showError(`Erro ao processar arquivo: ${error.message}`);
   }
+}
+
+function restoreFromCache(cache) {
+  console.log('Restaurando resultados do cache...');
+  resultsSection.style.display = 'block';
+  resetBtn.style.display = 'inline-flex';
+
+  // Agente 1
+  appState.agent1Output = cache.agent1;
+  updateAgentStatus(1, 'done', `${cache.agent1.length} transcrição(ões) [cache]`);
+  updateAgentProgress(1, cache.agent1.length, cache.agent1.length);
+  renderAgent1Results(cache.agent1);
+
+  // Agente 2
+  appState.agent2Output = cache.agent2;
+  updateAgentStatus(2, 'done', `${cache.agent2.length} mensagens unificadas [cache]`);
+  updateAgentProgress(2, cache.agent2.length, cache.agent2.length);
+  renderAgent2Results(cache.agent2);
+
+  // Agente 3
+  appState.agent3Output = cache.agent3;
+  const stats = cache.agent3.stats;
+  updateAgentStatus(3, 'done', `${stats.totalPerguntas} P&R extraída(s) [cache]`);
+  renderAgent3Results(cache.agent3);
+
+  processBtn.innerHTML = '<span class="btn-icon-left">✅</span> Pipeline Concluída [Cache]';
+  switchTab('tab-agent3');
 }
 
 // ===== PIPELINE ORCHESTRATION =====
@@ -164,28 +249,41 @@ async function runPipeline() {
 
   const { messages, mediaFiles } = appState.parseResult;
 
+  // Verificar cache parcial (especialmente Agente 1 que é o mais demorado)
+  const cache = loadCache(appState.file);
+
   try {
     // ============================
     // 🟦 AGENTE 1: Transcribitor
     // ============================
-    updateAgentStatus(1, 'running', 'Transcrevendo áudios...');
-    
-    try {
-      appState.agent1Output = await executeAgent1(
-        messages,
-        mediaFiles,
-        (current, total, filename) => {
-          updateAgentProgress(1, current, total);
-          updateAgentStatus(1, 'running', `Transcrevendo: ${filename || '...'}`);
-        }
-      );
-      
-      updateAgentStatus(1, 'done', `${appState.agent1Output.length} transcrição(ões)`);
-      renderAgent1Results(appState.agent1Output);
-    } catch (error) {
-      console.error('Erro no Agente 1:', error);
-      updateAgentStatus(1, 'error', `Erro: ${error.message}`);
-      appState.agent1Output = [];
+    if (cache && cache.agent1 && cache.agent1.length > 0) {
+      // Usar cache do Agente 1
+      appState.agent1Output = cache.agent1;
+      updateAgentStatus(1, 'done', `${cache.agent1.length} transcrição(ões) [cache]`);
+      updateAgentProgress(1, cache.agent1.length, cache.agent1.length);
+      renderAgent1Results(cache.agent1);
+      console.log('Agente 1: usando cache, pulando transcrição');
+    } else {
+      updateAgentStatus(1, 'running', 'Transcrevendo áudios...');
+
+      try {
+        appState.agent1Output = await executeAgent1(
+          messages,
+          mediaFiles,
+          (current, total, filename) => {
+            updateAgentProgress(1, current, total);
+            updateAgentStatus(1, 'running', `Transcrevendo: ${filename || '...'}`);
+          }
+        );
+
+        updateAgentStatus(1, 'done', `${appState.agent1Output.length} transcrição(ões)`);
+        renderAgent1Results(appState.agent1Output);
+        saveCache(appState.file, 'agent1', appState.agent1Output);
+      } catch (error) {
+        console.error('Erro no Agente 1:', error);
+        updateAgentStatus(1, 'error', `Erro: ${error.message}`);
+        appState.agent1Output = [];
+      }
     }
 
     // ============================
@@ -205,6 +303,7 @@ async function runPipeline() {
       
       updateAgentStatus(2, 'done', `${appState.agent2Output.length} mensagens unificadas`);
       renderAgent2Results(appState.agent2Output);
+      saveCache(appState.file, 'agent2', appState.agent2Output);
     } catch (error) {
       console.error('Erro no Agente 2:', error);
       updateAgentStatus(2, 'error', `Erro: ${error.message}`);
@@ -227,6 +326,7 @@ async function runPipeline() {
       const stats = appState.agent3Output.stats;
       updateAgentStatus(3, 'done', `${stats.totalPerguntas} P&R extraída(s)`);
       renderAgent3Results(appState.agent3Output);
+      saveCache(appState.file, 'agent3', appState.agent3Output);
     } catch (error) {
       console.error('Erro no Agente 3:', error);
       updateAgentStatus(3, 'error', `Erro: ${error.message}`);
