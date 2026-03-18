@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Analisador de conversas exportadas do WhatsApp com pipeline de 3 agentes: Transcrição, Reconstrução e Extração de P&R.">
+  <title>WhatsApp Conversation Analyzer — Pipeline de 3 Agentes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- HEADER -->
+    <header class="header" id="header">
+      <div class="header-content">
+        <div class="logo">
+          <div class="logo-icon">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/>
+              <path d="M10 16.5L14 20.5L22 12.5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <h1>WhatsApp Analyzer</h1>
+            <p class="subtitle">Pipeline de Inteligência em 3 Agentes</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <!-- API responsability moved to backend -->
+        </div>
+      </div>
+    </header>
+
+    <!-- UPLOAD AREA -->
+    <section class="upload-section" id="upload-section">
+      <div class="upload-zone" id="upload-zone">
+        <div class="upload-icon">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+            <path d="M32 8L32 44" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+            <path d="M20 20L32 8L44 20" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8 40V52C8 54.2091 9.79086 56 12 56H52C54.2091 56 56 54.2091 56 52V40" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h2>Arraste seu arquivo aqui</h2>
+        <p>Arquivo <strong>.zip</strong> exportado do WhatsApp (com mídia) ou <strong>.txt</strong></p>
+        <div class="upload-or">ou</div>
+        <label class="btn btn-primary" for="file-input">
+          Selecionar Arquivo
+        </label>
+        <input type="file" id="file-input" accept=".zip,.txt" hidden>
+      </div>
+      <div class="upload-summary" id="upload-summary"></div>
+    </section>
+
+    <!-- PIPELINE VISUAL -->
+    <section class="pipeline-section" id="pipeline-section">
+      <h2 class="section-title">Pipeline de Processamento</h2>
+      <div class="pipeline">
+        <!-- Agente 1 -->
+        <div class="agent-card agent-idle" id="agent1-card">
+          <div class="agent-color-bar agent1-color"></div>
+          <div class="agent-header">
+            <span class="agent-number">1</span>
+            <div>
+              <h3>Transcribitor</h3>
+              <p class="agent-role">Controller A</p>
+            </div>
+          </div>
+          <p class="agent-desc">Transcrição de áudios via API Whisper</p>
+          <div class="agent-progress" id="agent1-progress">
+            <div class="progress-track">
+              <div class="progress-bar" id="agent1-progress-bar"></div>
+            </div>
+            <span class="progress-text" id="agent1-progress-text"></span>
+          </div>
+          <div class="agent-status" id="agent1-status">Aguardando</div>
+        </div>
+
+        <!-- Conector -->
+        <div class="pipeline-connector">
+          <div class="connector-line"></div>
+          <div class="connector-arrow">→</div>
+        </div>
+
+        <!-- Agente 2 -->
+        <div class="agent-card agent-idle" id="agent2-card">
+          <div class="agent-color-bar agent2-color"></div>
+          <div class="agent-header">
+            <span class="agent-number">2</span>
+            <div>
+              <h3>Reconstrutor</h3>
+              <p class="agent-role">Controller B</p>
+            </div>
+          </div>
+          <p class="agent-desc">Merge do histórico + transcrições</p>
+          <div class="agent-progress" id="agent2-progress">
+            <div class="progress-track">
+              <div class="progress-bar" id="agent2-progress-bar"></div>
+            </div>
+            <span class="progress-text" id="agent2-progress-text"></span>
+          </div>
+          <div class="agent-status" id="agent2-status">Aguardando</div>
+        </div>
+
+        <!-- Conector -->
+        <div class="pipeline-connector">
+          <div class="connector-line"></div>
+          <div class="connector-arrow">→</div>
+        </div>
+
+        <!-- Agente 3 -->
+        <div class="agent-card agent-idle" id="agent3-card">
+          <div class="agent-color-bar agent3-color"></div>
+          <div class="agent-header">
+            <span class="agent-number">3</span>
+            <div>
+              <h3>Analista</h3>
+              <p class="agent-role">Controller C</p>
+            </div>
+          </div>
+          <p class="agent-desc">Extração de Perguntas & Respostas</p>
+          <div class="agent-progress" id="agent3-progress">
+            <div class="progress-track">
+              <div class="progress-bar" id="agent3-progress-bar"></div>
+            </div>
+            <span class="progress-text" id="agent3-progress-text"></span>
+          </div>
+          <div class="agent-status" id="agent3-status">Aguardando</div>
+        </div>
+      </div>
+
+      <!-- Botão Processar -->
+      <div class="pipeline-actions">
+        <button class="btn btn-primary btn-lg" id="process-btn" disabled>
+          <span class="btn-icon-left">▶</span>
+          Iniciar Pipeline
+        </button>
+        <button class="btn btn-outline" id="reset-btn" style="display:none;">
+          <span class="btn-icon-left">↻</span>
+          Novo Arquivo
+        </button>
+      </div>
+    </section>
+
+    <!-- TABS DE RESULTADOS -->
+    <section class="results-section" id="results-section" style="display:none;">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="tab-agent1" id="tab-btn-agent1">
+          <span class="tab-icon agent1-dot"></span>
+          Agente 1 — Transcrições
+        </button>
+        <button class="tab-btn" data-tab="tab-agent2" id="tab-btn-agent2">
+          <span class="tab-icon agent2-dot"></span>
+          Agente 2 — Conversa Unificada
+        </button>
+        <button class="tab-btn" data-tab="tab-agent3" id="tab-btn-agent3">
+          <span class="tab-icon agent3-dot"></span>
+          Agente 3 — Perguntas & Respostas
+        </button>
+      </div>
+
+      <!-- Tab Content -->
+      <div class="tab-content active" id="tab-agent1">
+        <div class="tab-header">
+          <h3>🟦 Agente Transcribitor — Output</h3>
+          <div class="export-btns">
+            <button class="btn btn-sm btn-outline" id="export-agent1-json">📥 JSON</button>
+            <button class="btn btn-sm btn-outline" id="export-agent1-csv">📥 CSV</button>
+          </div>
+        </div>
+        <div id="agent1-results" class="results-content">
+          <div class="empty-state">
+            <span class="empty-icon">⏳</span>
+            <p>Aguardando processamento...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-agent2">
+        <div class="tab-header">
+          <h3>🟨 Agente Reconstrutor — Output</h3>
+          <div class="export-btns">
+            <button class="btn btn-sm btn-outline" id="export-agent2-json">📥 JSON</button>
+            <button class="btn btn-sm btn-outline" id="export-agent2-csv">📥 CSV</button>
+          </div>
+        </div>
+        <div id="agent2-results" class="results-content">
+          <div class="empty-state">
+            <span class="empty-icon">⏳</span>
+            <p>Aguardando processamento...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-agent3">
+        <div class="tab-header">
+          <h3>🟩 Agente Analista — Output (Final View)</h3>
+          <div class="export-btns">
+            <button class="btn btn-sm btn-outline" id="export-agent3-json">📥 JSON</button>
+            <button class="btn btn-sm btn-outline" id="export-agent3-csv">📥 CSV</button>
+          </div>
+        </div>
+        <div id="agent3-results" class="results-content">
+          <div class="empty-state">
+            <span class="empty-icon">⏳</span>
+            <p>Aguardando processamento...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      <p>WhatsApp Conversation Analyzer — Pipeline MVC com 3 Agentes</p>
+    </footer>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

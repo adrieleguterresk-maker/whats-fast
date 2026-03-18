@@ -1,0 +1,334 @@
+/**
+ * Main.js — Orquestrador da Pipeline
+ * 
+ * Coordena o fluxo: Upload → Parser → Agente 1 → Agente 2 → Agente 3
+ * Gerencia estado da aplicação e progresso de cada etapa
+ */
+
+import { parseZipFile, parseTxtFile } from './modules/parser.js';
+import { executeAgent1 } from './modules/agent1-transcriber.js';
+import { executeAgent2 } from './modules/agent2-reconstructor.js';
+import { executeAgent3 } from './modules/agent3-analyst.js';
+import {
+  updateAgentStatus,
+  updateAgentProgress,
+  renderAgent1Results,
+  renderAgent2Results,
+  renderAgent3Results,
+  renderUploadSummary,
+  exportJSON,
+  exportCSV,
+  switchTab
+} from './modules/ui.js';
+
+// ===== STATE =====
+let appState = {
+  file: null,
+  parseResult: null,
+  agent1Output: null,
+  agent2Output: null,
+  agent3Output: null,
+  isProcessing: false
+};
+
+// ===== DOM ELEMENTS =====
+const uploadZone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+const processBtn = document.getElementById('process-btn');
+const resetBtn = document.getElementById('reset-btn');
+const pipelineSection = document.getElementById('pipeline-section');
+const resultsSection = document.getElementById('results-section');
+
+// ===== UPLOAD HANDLING =====
+
+// Drag & Drop
+uploadZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  uploadZone.classList.add('dragover');
+});
+
+uploadZone.addEventListener('dragleave', () => {
+  uploadZone.classList.remove('dragover');
+});
+
+uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    handleFile(files[0]);
+  }
+});
+
+// Click to upload
+uploadZone.addEventListener('click', (e) => {
+  if (e.target.tagName !== 'LABEL' && e.target.tagName !== 'INPUT') {
+    fileInput.click();
+  }
+});
+
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files.length > 0) {
+    handleFile(e.target.files[0]);
+  }
+});
+
+
+
+// Process button
+processBtn.addEventListener('click', () => {
+  if (!appState.isProcessing && appState.parseResult) {
+    runPipeline();
+  }
+});
+
+// Reset button
+resetBtn.addEventListener('click', () => {
+  resetApp();
+});
+
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    switchTab(btn.dataset.tab);
+  });
+});
+
+// Export buttons
+document.getElementById('export-agent1-json')?.addEventListener('click', () => {
+  if (appState.agent1Output) exportJSON(appState.agent1Output, 'agent1-transcricoes');
+});
+document.getElementById('export-agent1-csv')?.addEventListener('click', () => {
+  if (appState.agent1Output) exportCSV(appState.agent1Output, 'agent1-transcricoes');
+});
+document.getElementById('export-agent2-json')?.addEventListener('click', () => {
+  if (appState.agent2Output) exportJSON(appState.agent2Output, 'agent2-conversa-unificada');
+});
+document.getElementById('export-agent2-csv')?.addEventListener('click', () => {
+  if (appState.agent2Output) exportCSV(appState.agent2Output, 'agent2-conversa-unificada');
+});
+document.getElementById('export-agent3-json')?.addEventListener('click', () => {
+  if (appState.agent3Output) exportJSON(appState.agent3Output.qaList, 'agent3-perguntas-respostas');
+});
+document.getElementById('export-agent3-csv')?.addEventListener('click', () => {
+  if (appState.agent3Output) exportCSV(appState.agent3Output.qaList, 'agent3-perguntas-respostas');
+});
+
+// ===== FILE HANDLING =====
+
+async function handleFile(file) {
+  const validTypes = ['.zip', '.txt'];
+  const extension = '.' + file.name.split('.').pop().toLowerCase();
+  
+  if (!validTypes.includes(extension)) {
+    showError('Formato não suportado. Use .zip ou .txt exportado do WhatsApp.');
+    return;
+  }
+
+  uploadZone.classList.add('has-file');
+  uploadZone.querySelector('h2').textContent = file.name;
+  uploadZone.querySelector('p').innerHTML = `<strong>${formatSize(file.size)}</strong> — Pronto para processar`;
+
+  try {
+    let result;
+    if (extension === '.zip') {
+      result = await parseZipFile(file);
+    } else {
+      result = await parseTxtFile(file);
+    }
+
+    appState.file = file;
+    appState.parseResult = result;
+    
+    renderUploadSummary(result);
+    processBtn.disabled = false;
+    processBtn.classList.add('pulse-ready');
+    
+  } catch (error) {
+    console.error('Erro ao parsear arquivo:', error);
+    showError(`Erro ao processar arquivo: ${error.message}`);
+  }
+}
+
+// ===== PIPELINE ORCHESTRATION =====
+
+async function runPipeline() {
+  if (appState.isProcessing || !appState.parseResult) return;
+  
+  appState.isProcessing = true;
+  processBtn.disabled = true;
+  processBtn.innerHTML = '<span class="btn-icon-left">⏳</span> Processando...';
+  resultsSection.style.display = 'block';
+  resetBtn.style.display = 'inline-flex';
+
+  const { messages, mediaFiles } = appState.parseResult;
+
+  try {
+    // ============================
+    // 🟦 AGENTE 1: Transcribitor
+    // ============================
+    updateAgentStatus(1, 'running', 'Transcrevendo áudios...');
+    
+    try {
+      appState.agent1Output = await executeAgent1(
+        messages,
+        mediaFiles,
+        (current, total, filename) => {
+          updateAgentProgress(1, current, total);
+          updateAgentStatus(1, 'running', `Transcrevendo: ${filename || '...'}`);
+        }
+      );
+      
+      updateAgentStatus(1, 'done', `${appState.agent1Output.length} transcrição(ões)`);
+      renderAgent1Results(appState.agent1Output);
+    } catch (error) {
+      console.error('Erro no Agente 1:', error);
+      updateAgentStatus(1, 'error', `Erro: ${error.message}`);
+      appState.agent1Output = [];
+    }
+
+    // ============================
+    // 🟨 AGENTE 2: Reconstrutor
+    // ============================
+    updateAgentStatus(2, 'running', 'Reconstruindo conversa...');
+    
+    try {
+      appState.agent2Output = executeAgent2(
+        messages,
+        appState.agent1Output || [],
+        mediaFiles,
+        (current, total) => {
+          updateAgentProgress(2, current, total);
+        }
+      );
+      
+      updateAgentStatus(2, 'done', `${appState.agent2Output.length} mensagens unificadas`);
+      renderAgent2Results(appState.agent2Output);
+    } catch (error) {
+      console.error('Erro no Agente 2:', error);
+      updateAgentStatus(2, 'error', `Erro: ${error.message}`);
+      appState.agent2Output = [];
+    }
+
+    // ============================
+    // 🟩 AGENTE 3: Analista
+    // ============================
+    updateAgentStatus(3, 'running', 'Extraindo perguntas e respostas...');
+    
+    try {
+      appState.agent3Output = executeAgent3(
+        appState.agent2Output || [],
+        (current, total) => {
+          updateAgentProgress(3, current, total);
+        }
+      );
+      
+      const stats = appState.agent3Output.stats;
+      updateAgentStatus(3, 'done', `${stats.totalPerguntas} P&R extraída(s)`);
+      renderAgent3Results(appState.agent3Output);
+    } catch (error) {
+      console.error('Erro no Agente 3:', error);
+      updateAgentStatus(3, 'error', `Erro: ${error.message}`);
+    }
+
+    // Pipeline concluída
+    processBtn.innerHTML = '<span class="btn-icon-left">✅</span> Pipeline Concluída';
+    
+    // Auto-selecionar aba do Agente 3 (resultado final)
+    switchTab('tab-agent3');
+
+  } catch (error) {
+    console.error('Erro na pipeline:', error);
+    showError(`Erro na pipeline: ${error.message}`);
+  }
+
+  appState.isProcessing = false;
+}
+
+// ===== RESET =====
+
+function resetApp() {
+  appState = {
+    file: null,
+    parseResult: null,
+    agent1Output: null,
+    agent2Output: null,
+    agent3Output: null,
+    isProcessing: false
+  };
+
+  // Reset upload
+  uploadZone.classList.remove('has-file');
+  uploadZone.querySelector('h2').textContent = 'Arraste seu arquivo aqui';
+  uploadZone.querySelector('p').innerHTML = 'Arquivo <strong>.zip</strong> exportado do WhatsApp (com mídia) ou <strong>.txt</strong>';
+  fileInput.value = '';
+
+  // Reset summary
+  const summary = document.getElementById('upload-summary');
+  summary.classList.remove('visible');
+  summary.innerHTML = '';
+
+  // Reset agents
+  for (let i = 1; i <= 3; i++) {
+    updateAgentStatus(i, 'idle');
+    updateAgentProgress(i, 0, 0);
+  }
+
+  // Reset buttons
+  processBtn.disabled = true;
+  processBtn.innerHTML = '<span class="btn-icon-left">▶</span> Iniciar Pipeline';
+  resetBtn.style.display = 'none';
+
+  // Hide results
+  resultsSection.style.display = 'none';
+
+  // Reset tab contents
+  document.querySelectorAll('.results-content').forEach(el => {
+    el.innerHTML = `
+      <div class="empty-state">
+        <span class="empty-icon">⏳</span>
+        <p>Aguardando processamento...</p>
+      </div>
+    `;
+  });
+
+  // Reset to first tab
+  switchTab('tab-agent1');
+}
+
+// ===== HELPERS =====
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function showError(message) {
+  // Simple alert for now, could be enhanced with a toast system
+  const errDiv = document.createElement('div');
+  errDiv.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    max-width: 400px;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #FF6B6B, #ee5a24);
+    color: white;
+    border-radius: 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    box-shadow: 0 8px 32px rgba(255, 107, 107, 0.3);
+    z-index: 9999;
+    animation: slideDown 0.3s ease;
+  `;
+  errDiv.textContent = message;
+  document.body.appendChild(errDiv);
+  
+  setTimeout(() => {
+    errDiv.style.opacity = '0';
+    errDiv.style.transition = 'opacity 0.3s ease';
+    setTimeout(() => errDiv.remove(), 300);
+  }, 5000);
+}
