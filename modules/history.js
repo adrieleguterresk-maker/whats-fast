@@ -43,7 +43,7 @@ export function extractMentoradoName(filename) {
  * Salva uma análise concluída no Supabase
  * @param {Object} params
  */
-export async function saveAnalysisToHistory({ mentoria, filename, nicho, agent3Output }) {
+export async function saveAnalysisToHistory({ mentoria, filename, nicho, especialista, agent3Output }) {
   if (!agent3Output || !agent3Output.qaList) return;
   
   const mentorado = extractMentoradoName(filename);
@@ -60,7 +60,7 @@ export async function saveAnalysisToHistory({ mentoria, filename, nicho, agent3O
     mentoria: mentoria || 'cleiton',
     mentorado,
     nicho: (nicho || '').trim() || 'Não informado',
-    especialista: (params.especialista || '').trim() || 'Não informado',
+    especialista: (especialista || '').trim() || 'Não informado',
     filename,
     data_analise: new Date().toISOString().split('T')[0],
     total_duvidas: stats.totalPerguntas,
