@@ -41,7 +41,13 @@ async function transcribeAudio(audioBlob, filename) {
     const mimeType = mimeTypes[extension] || 'audio/ogg';
     const file = new File([audioBlob], filename, { type: mimeType });
     
-    formData.append('file', file);
+    // A OpenAI prefere extensões válidas (.ogg em vez de .opus)
+    const newName = filename.replace(/\.opus$/i, '.ogg');
+    
+    formData.append('file', file, newName);
+    formData.append('model', 'whisper-1');
+    formData.append('language', 'pt');
+    formData.append('response_format', 'text'); // Retorna texto puro
 
     // Enviar para a Vercel Serverless Function em vez da Supabase Edge Function
     const response = await fetch('/api/transcribe', {
