@@ -229,10 +229,11 @@ const CATEGORY_COLORS = {
   'Comercial': '#34d399',
   'Sucesso do Cliente': '#60a5fa',
   'Mentalidade': '#fbbf24',
-  'Arquétipos / Branding': '#a78bfa',
+  'Identidade Visual': '#a78bfa',
   'Produção de Conteúdo': '#fb923c',
   'Contratação': '#2dd4bf',
-  'Acesso / Onboarding': '#cbd5e1',
+  'Acesso': '#cbd5e1',
+  'Gestão': '#f87171',
   'Dúvidas Gerais': '#94a3b8'
 };
 
@@ -464,8 +465,8 @@ export function exportWord(qaList, filename) {
     html += `<p>Data: ${escapeHtml(thread.data)}</p>`;
     
     thread.items.forEach((item, index) => {
-      const pText = escapeHtml(item.pergunta).replace(/\\n/g, '<br>');
-      const rText = escapeHtml(item.resposta).replace(/\\n/g, '<br>');
+      const pText = escapeHtml(item.pergunta).replace(/\n/g, '<br>');
+      const rText = escapeHtml(item.resposta).replace(/\n/g, '<br>');
 
       if (index === 0) {
         html += `<p>PERGUNTA: ${pText}</p>`;
@@ -484,7 +485,7 @@ export function exportWord(qaList, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = \`\${filename}.doc\`;
+  a.download = `${filename}.doc`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -595,15 +596,16 @@ function renderAgent3Dashboard(categorias, mentoriaType = 'cleiton') {
     'Comercial': '💰',
     'Sucesso do Cliente': '⭐',
     'Mentalidade': '🧠',
-    'Arquétipos / Branding': '✨',
+    'Identidade Visual': '✨',
     'Produção de Conteúdo': '📱',
     'Contratação': '👥',
-    'Acesso / Onboarding': '🔑'
+    'Acesso': '🔑',
+    'Gestão': '⚙️'
   };
 
   // Pilares de cada mentoria
-  const cleitonPillars = ['Marketing', 'Comercial', 'Sucesso do Cliente', 'Mentalidade', 'Contratação'];
-  const juliaPillars = ['Arquétipos / Branding', 'Produção de Conteúdo', 'Acesso / Onboarding'];
+  const cleitonPillars = ['Marketing', 'Comercial', 'Sucesso do Cliente', 'Mentalidade', 'Contratação', 'Gestão'];
+  const juliaPillars = ['Identidade Visual', 'Produção de Conteúdo', 'Acesso'];
 
   // Determinar quais categorias mostrar
   // 1. Mostrar os pilares da mentoria selecionada (se count > 0)

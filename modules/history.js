@@ -174,7 +174,35 @@ export async function getHistoryStats(mentoria) {
 }
 
 /**
+ * Recupera os detalhes completos de uma análise do Supabase, incluindo as Q&A
+ * @param {string|number} analysisId - ID da análise na tabela analises
+ */
+export async function getAnalysisDetails(analysisId) {
+  try {
+    const { data: analise, error: err1 } = await supabase
+      .from('analises')
+      .select('*')
+      .eq('id', analysisId)
+      .single();
+    if (err1) throw err1;
+
+    const { data: qas, error: err2 } = await supabase
+      .from('perguntas_respostas')
+      .select('*')
+      .eq('analise_id', analysisId)
+      .order('id', { ascending: true });
+    if (err2) throw err2;
+
+    return { analise, qaList: qas || [] };
+  } catch (e) {
+    console.error('Erro ao recuperar análise detalhada:', e);
+    throw e;
+  }
+}
+
+/**
  * Retorna análises detalhadas (Nicho -> Mês -> Categoria)
+
  * @param {string} [mentoria]
  */
 export async function getDetailedAnalytics(mentoria) {

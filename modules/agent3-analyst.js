@@ -87,61 +87,7 @@ function isRelevantQuestion(text) {
   return questionPatterns.some(pattern => pattern.test(trimmed));
 }
 
-// ===== AUTO-DETECÇÃO DE CATEGORIAS =====
-
-const CATEGORY_KEYWORDS = {
-  'Marketing': [
-    'anúncio', 'tráfego', 'audiência', 'persona', 'marketing', 'postagem',
-    'campanha', 'ads', 'público', 'engajamento', 'seguidor'
-  ],
-  'Comercial': [
-    'proposta', 'venda', 'preço', 'contrato', 'fechamento', 'comercial',
-    'vender', 'pagamento', 'pix', 'boleto', 'cartão', 'desconto', 'objeção'
-  ],
-  'Sucesso do Cliente': [
-    'suporte', 'ajuda', 'problema', 'erro', 'não consigo', 'dúvida',
-    'fidelização', 'retorno', 'acompanhamento', 'resultado'
-  ],
-  'Mentalidade': [
-    'mindset', 'pensamento', 'trava', 'crença', 'mentalidade', 'bloqueio',
-    'medo', 'insegurança', 'procrastinação', 'foco', 'motivação'
-  ],
-  'Arquétipos / Branding': [
-    'arquétipo', 'identidade visual', 'marca', 'feed', 'estética', 'foto',
-    'fotografia', 'paleta', 'cores', 'logo', 'posicionamento'
-  ],
-  'Produção de Conteúdo': [
-    'conteúdo', 'post', 'vídeo', 'reels', 'carrossel', 'produção',
-    'roteiro', 'linha editorial', 'ideia', 'copys', 'gravação'
-  ],
-  'Contratação': [
-    'equipe', 'vaga', 'contratar', 'freelancer', 'serviço', 'colaborador',
-    'recrutamento', 'delegar', 'seleção'
-  ],
-  'Acesso / Onboarding': [
-    'login', 'plataforma', 'senha', 'onboarding', 'call', 'acesso', 'link',
-    'hotmart', 'entrar', 'boas vindas'
-  ]
-};
-
-// Compilar regex para cada categoria
-const CATEGORY_REGEXES = {};
-for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-  CATEGORY_REGEXES[category] = new RegExp(`(${keywords.join('|')})`, 'i');
-}
-
-/**
- * Detecta a categoria de uma pergunta baseado em keywords
- */
-function detectCategory(text) {
-  if (!text) return 'Dúvidas Gerais';
-
-  for (const [category, regex] of Object.entries(CATEGORY_REGEXES)) {
-    if (regex.test(text)) return category;
-  }
-
-  return 'Dúvidas Gerais';
-}
+// ===== AUTO-DETECÇÃO DE CATEGORIAS VIA LLM =====
 
 /**
  * Agrupa mensagens consecutivas do mesmo remetente
@@ -189,25 +135,13 @@ function groupConsecutiveMessages(messages) {
 }
 
 /**
- * Executa o Agente 3: Extração de Perguntas e Respostas
- *
- * OUTPUT:
- * [
- *   {
- *     "data_pergunta": "03/03/2026",
- *     "hora_pergunta": "10:26",
- *     "remetente": "Nome",
- *     "pergunta": "texto exato (transcrição se áudio)",
- *     "resposta": "texto exato (transcrição se áudio)",
- *     "categoria": "Categoria detectada"
- *   }
- * ]
+ * Executa o Agente 3: Extração de Perguntas e Respostas com Categorização LLM
  *
  * @param {Array} conversation - Model de Conversa Unificada do Agente 2
  * @param {Function} onProgress - Callback de progresso
  * @returns {Object} { qaList, roles, stats, categorias }
  */
-export function executeAgent3(conversation, onProgress = () => {}) {
+export async function executeAgent3(conversation, onProgress = () => {}) {
   // Filtrar apenas mensagens de participantes (excluir sistema e apagadas)
   const userMessages = conversation.filter(m =>
     m.remetente !== '__SISTEMA__' && m.tipo !== 'sistema' && m.tipo !== 'apagada'
@@ -227,27 +161,45 @@ export function executeAgent3(conversation, onProgress = () => {}) {
   // Identificar participantes
   const participants = [...new Set(grouped.map(m => m.remetente))];
   
-  // Heurística de Atendimento: O cliente normalmente é o primeiro a mandar mensagem (inbound)
-  const clientName = participants.length > 0 ? participants[0] : null;
+  // Heurística de Atendimento:
+  // 1. Procurar por nomes conhecidos de especialistas (Cleiton, Ádila, Equipe)
+  // 2. Se não achar, assumir que o primeiro a falar é o cliente (inbound) se o atendente tiver nome de especialista
+  const specialistNames = ['cleiton', 'ádila', 'adila', 'equipe', 'suporte', 'atendimento', 'especialista'];
+  
+  let specialistName = participants.find(p => 
+    specialistNames.some(s => p.toLowerCase().includes(s))
+  );
 
-  const qaList = [];
+  let clientName = null;
+  if (specialistName) {
+    // Se achamos o especialista pelo nome, o outro (ou o primeiro que não seja ele) é o cliente
+    clientName = participants.find(p => p !== specialistName);
+  } else {
+    // Fallback: O cliente normalmente é o primeiro a mandar mensagem
+    clientName = participants.length > 0 ? participants[0] : null;
+    specialistName = participants.find(p => p !== clientName);
+  }
+
+  let qaListTemp = [];
 
   for (let i = 0; i < grouped.length; i++) {
     if (i % 10 === 0) {
-      onProgress(i, grouped.length);
+      onProgress(Math.floor(i * 0.5), grouped.length); // reserva 50% do progresso para a IA
     }
 
     const msg = grouped[i];
     
-    // REGRA: Apenas analisar mensagens do Cliente como "Perguntas"
+    // REGRA DE OURO: A pergunta SEMPRE será feita pelo cliente.
+    // Se o remetente for o Especialista, nunca será uma "Pergunta" principal, mesmo que contenha "?"
+    if (msg.remetente === specialistName) continue;
     if (clientName && msg.remetente !== clientName) continue;
 
     const textoAnalise = msg.textoAnalise || msg.conteudo;
 
-    // Ignorar small talk
+    // Ignorar small talk (filtro primário para economizar envios API)
     if (isSmallTalk(textoAnalise)) continue;
 
-    // Verificar se é uma pergunta relevante
+    // Verificar se é uma pergunta relevante (filtro primário local)
     if (!isRelevantQuestion(textoAnalise)) continue;
 
     // Procurar resposta: próximo grupo de mensagem de remetente diferente
@@ -256,20 +208,16 @@ export function executeAgent3(conversation, onProgress = () => {}) {
     for (let j = i + 1; j < grouped.length; j++) {
       const nextMsg = grouped[j];
 
-      // Mesmo remetente → pular
       if (nextMsg.remetente === msg.remetente) continue;
 
       const nextTexto = nextMsg.textoAnalise || nextMsg.conteudo;
 
-      // Small talk do respondente → pular
       if (isSmallTalk(nextTexto)) continue;
 
-      // Encontrou resposta — usar textoAnalise (com transcrição se áudio)
       resposta = nextTexto;
       break;
     }
 
-    // Buscar mediaFilenames da resposta
     let mediaFilenamesResposta = [];
     for (let j = i + 1; j < grouped.length; j++) {
       if (grouped[j].remetente !== msg.remetente && !isSmallTalk(grouped[j].textoAnalise || grouped[j].conteudo)) {
@@ -278,11 +226,7 @@ export function executeAgent3(conversation, onProgress = () => {}) {
       }
     }
 
-    // Detectar categoria
-    const categoria = detectCategory(textoAnalise);
-
-    // Montar saída — texto com transcrições integradas
-    qaList.push({
+    qaListTemp.push({
       data_pergunta: msg.data,
       hora_pergunta: msg.hora,
       remetente: msg.remetente,
@@ -290,26 +234,64 @@ export function executeAgent3(conversation, onProgress = () => {}) {
       mediaFilenames_pergunta: msg.mediaFilenames || [],
       resposta: resposta || '[Sem resposta identificada]',
       mediaFilenames_resposta: mediaFilenamesResposta,
-      categoria
+      categoria: 'Pendente'
     });
+  }
+
+  // ===================================
+  // PASSO LLM: CATEGORIZAR EM LOTE
+  // ===================================
+  let finalQaList = qaListTemp;
+
+  if (qaListTemp.length > 0) {
+    onProgress(grouped.length * 0.75, grouped.length); 
+    try {
+      const payloadQas = qaListTemp.map(qa => ({
+        pergunta: qa.pergunta,
+        resposta: qa.resposta
+      }));
+
+      const response = await fetch('/api/agent3-categorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qas: payloadQas })
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const { categories } = await response.json();
+      
+      qaListTemp.forEach((qa, index) => {
+         qa.categoria = categories[index] || 'Dúvidas Gerais';
+      });
+      
+      // Remover P&R marcadas pela LLM como irrelevantes
+      finalQaList = qaListTemp.filter(qa => qa.categoria !== 'Irrelevante');
+
+    } catch (err) {
+      console.error('Erro ao categorizar com IA:', err);
+      finalQaList.forEach(qa => qa.categoria = 'Dúvidas Gerais');
+    }
   }
 
   onProgress(grouped.length, grouped.length);
 
   // Contagem por categoria
   const categoriaCounts = {};
-  for (const qa of qaList) {
+  for (const qa of finalQaList) {
     categoriaCounts[qa.categoria] = (categoriaCounts[qa.categoria] || 0) + 1;
   }
 
   return {
-    qaList,
+    qaList: finalQaList,
     roles: { participantes: participants },
     categorias: categoriaCounts,
     stats: {
-      totalPerguntas: qaList.length,
-      comResposta: qaList.filter(q => q.resposta !== '[Sem resposta identificada]').length,
-      semResposta: qaList.filter(q => q.resposta === '[Sem resposta identificada]').length
+      totalPerguntas: finalQaList.length,
+      comResposta: finalQaList.filter(q => q.resposta !== '[Sem resposta identificada]').length,
+      semResposta: finalQaList.filter(q => q.resposta === '[Sem resposta identificada]').length
     }
   };
 }

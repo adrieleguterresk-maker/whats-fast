@@ -12,6 +12,7 @@ import { executeAgent3 } from './modules/agent3-analyst.js';
 import {
   getHistoryStats,
   getDetailedAnalytics,
+  getAnalysisDetails,
   removeFromHistory,
   clearHistory,
   saveAnalysisToHistory
@@ -53,6 +54,10 @@ const resultsSection = document.getElementById('results-section');
 const rerunBtn1 = document.getElementById('rerun-agent1');
 const rerunBtn2 = document.getElementById('rerun-agent2');
 const rerunBtn3 = document.getElementById('rerun-agent3');
+const historyReloadSection = document.getElementById('history-reload-section');
+const historySearchInput = document.getElementById('history-search-input');
+const historyDropdownOptions = document.getElementById('history-dropdown-options');
+const loadHistoryBtn = document.getElementById('load-history-btn');
 
 // ===== UPLOAD HANDLING =====
 
@@ -171,23 +176,23 @@ document.getElementById('copy-agent3-txt')?.addEventListener('click', async (e) 
 
     const nomeCliente = relatorio.length > 0 ? relatorio[0].remetente : 'Cliente';
 
-    let text = \`NOME: \${nomeCliente}\\n\`;
-    text += \`NICHO: \${nichoName}\\n\\n\\n\`;
+    let text = `NOME: ${nomeCliente}\n`;
+    text += `NICHO: ${nichoName}\n\n\n`;
 
     relatorio.forEach(thread => {
-      text += \`\${thread.categoria.toUpperCase()}\\n\`;
-      text += \`Data: \${thread.data}\\n\`;
+      text += `${thread.categoria.toUpperCase()}\n`;
+      text += `Data: ${thread.data}\n`;
       
       thread.items.forEach((item, index) => {
         if (index === 0) {
-          text += \`PERGUNTA: \${item.pergunta}\\n\`;
-          text += \`RESPOSTA: \${item.resposta}\\n\`;
+          text += `PERGUNTA: ${item.pergunta}\n`;
+          text += `RESPOSTA: ${item.resposta}\n`;
         } else {
-          text += \`(PERGUNTA) CONT.: \${item.pergunta}\\n\`;
-          text += \`(RESPOSTA) CONT.: \${item.resposta}\\n\`;
+          text += `(PERGUNTA) CONT.: ${item.pergunta}\n`;
+          text += `(RESPOSTA) CONT.: ${item.resposta}\n`;
         }
       });
-      text += \`\\n\\n\`;
+      text += `\n\n`;
     });
     
     await navigator.clipboard.writeText(text);
@@ -299,7 +304,7 @@ async function runPipeline() {
     // ============================
     updateAgentStatus(3, 'running', 'Extraindo perguntas e respostas...');
     
-    appState.agent3Output = executeAgent3(
+    appState.agent3Output = await executeAgent3(
       appState.agent2Output || [],
       (current, total) => {
         updateAgentProgress(3, current, total);
@@ -395,7 +400,7 @@ async function rerunAgent(agentNumber) {
       if (rerunBtn3) rerunBtn3.style.display = 'none';
       switchTab('tab-agent3');
       updateAgentStatus(3, 'running', 'Extraindo perguntas e respostas...');
-      appState.agent3Output = executeAgent3(appState.agent2Output || [], (current, total) => updateAgentProgress(3, current, total));
+      appState.agent3Output = await executeAgent3(appState.agent2Output || [], (current, total) => updateAgentProgress(3, current, total));
       const stats = appState.agent3Output.stats;
       updateAgentStatus(3, 'done', `${stats.totalPerguntas} P&R extraída(s)`);
       renderAgent3Results(appState.agent3Output, mediaFiles, appState.mentoriaType);
@@ -517,7 +522,132 @@ async function refreshHistoryDashboard() {
   const stats = await getHistoryStats(selectedMentoria);
   const detailedStats = await getDetailedAnalytics(selectedMentoria);
   renderHistoryDashboard(stats, detailedStats, selectedMentoria);
+  
+  // Atualizar Dropdown de Histórico
+  updateHistoryDropdown(stats.registros);
 }
+
+function updateHistoryDropdown(registros) {
+  if (!historyReloadSection || !historyDropdownOptions) return;
+  
+  appState.historyRecords = registros || [];
+  
+  if (registros.length === 0) {
+    historyReloadSection.style.display = 'none';
+    return;
+  }
+  
+  historyReloadSection.style.display = 'block';
+  renderHistoryOptions(appState.historyRecords);
+}
+
+function renderHistoryOptions(options) {
+  if (!historyDropdownOptions) return;
+  
+  if (options.length === 0) {
+    historyDropdownOptions.innerHTML = '<div class="no-options">Nenhum histórico encontrado</div>';
+    return;
+  }
+  
+  let html = '';
+  options.forEach(record => {
+    const isSelected = appState.selectedHistoryId === record.id;
+    html += `
+      <div class="dropdown-option ${isSelected ? 'selected' : ''}" data-id="${record.id}">
+        <strong>${record.mentorado}</strong>
+        <span class="option-date">${record.nicho} — ${record.dataAnalise} (${record.totalDuvidas} dúvidas)</span>
+      </div>
+    `;
+  });
+  
+  historyDropdownOptions.innerHTML = html;
+
+  
+  // Re-attach listeners
+  historyDropdownOptions.querySelectorAll('.dropdown-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      appState.selectedHistoryId = opt.dataset.id;
+      if (historySearchInput) {
+        historySearchInput.value = opt.querySelector('strong').textContent;
+      }
+      historyDropdownOptions.classList.remove('visible');
+      if (loadHistoryBtn) loadHistoryBtn.disabled = false;
+      renderHistoryOptions(appState.historyRecords); // re-render to highlight selected
+    });
+  });
+}
+
+// Event Listeners for Dropdown
+historySearchInput?.addEventListener('focus', () => {
+  historyDropdownOptions?.classList.add('visible');
+});
+
+document.addEventListener('click', (e) => {
+  if (!historySearchInput?.contains(e.target) && !historyDropdownOptions?.contains(e.target)) {
+    historyDropdownOptions?.classList.remove('visible');
+  }
+});
+
+historySearchInput?.addEventListener('input', (e) => {
+  const term = e.target.value.toLowerCase();
+  if (!appState.historyRecords) return;
+  
+  historyDropdownOptions?.classList.add('visible');
+  const filtered = appState.historyRecords.filter(r => 
+    r.mentorado.toLowerCase().includes(term) || r.nicho.toLowerCase().includes(term)
+  );
+  renderHistoryOptions(filtered);
+});
+
+// Load History Button
+loadHistoryBtn?.addEventListener('click', async () => {
+  if (!appState.selectedHistoryId) return;
+  
+  try {
+    loadHistoryBtn.disabled = true;
+    loadHistoryBtn.innerHTML = '⏳ Carregando...';
+    
+    const { analise, qaList } = await getAnalysisDetails(appState.selectedHistoryId);
+    
+    appState.agent3Output = {
+      qaList,
+      stats: {
+        totalPerguntas: analise.total_duvidas,
+        comResposta: analise.com_resposta,
+        semResposta: analise.sem_resposta
+      },
+      categorias: analise.categorias || {}
+    };
+    
+    const nichoInput = document.getElementById('nicho-input');
+    if (nichoInput) nichoInput.value = analise.nicho;
+    
+    // Results section is hidden on load, display it
+    const resultsSection = document.getElementById('results-section');
+    if (resultsSection) resultsSection.style.display = 'block';
+    
+    renderAgent3Results(appState.agent3Output, new Map(), analise.mentoria);
+    
+    // Ajustar UI dos agentes para refletir que apenas o 3 está carregado do banco
+    document.getElementById('agent1-card')?.classList.replace('agent-idle', 'agent-done');
+    if (document.getElementById('agent1-status')) document.getElementById('agent1-status').textContent = 'Recuperado do DB';
+    document.getElementById('agent2-card')?.classList.replace('agent-idle', 'agent-done');
+    if (document.getElementById('agent2-status')) document.getElementById('agent2-status').textContent = 'Recuperado do DB';
+    document.getElementById('agent3-card')?.classList.replace('agent-idle', 'agent-done');
+    if (document.getElementById('agent3-status')) document.getElementById('agent3-status').textContent = 'Carregado do Histórico';
+    
+    switchTab('tab-agent3');
+    
+    // Scroll down to results
+    resultsSection?.scrollIntoView({ behavior: 'smooth' });
+    
+  } catch (error) {
+    showError('Erro ao carregar do histórico: ' + error.message);
+  } finally {
+    loadHistoryBtn.disabled = false;
+    loadHistoryBtn.innerHTML = 'Carregar Histórico Selecionado';
+  }
+});
 
 // Clear history button
 document.getElementById('clear-history-btn')?.addEventListener('click', async () => {

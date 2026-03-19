@@ -53,6 +53,7 @@
         <input type="text" id="nicho-input" placeholder="Ex: Dentista, Esteticista, Médica..." autocomplete="off">
       </div>
 
+
       <div class="file-upload-wrapper" id="drop-zone">
         <input type="file" id="file-upload" accept=".zip" class="file-input" />
         <div class="upload-icon">
@@ -71,6 +72,22 @@
         <input type="file" id="file-input" accept=".zip,.txt" hidden>
       </div>
       <div class="upload-summary" id="upload-summary"></div>
+
+      <!-- Recarregar Histórico do Supabase -->
+      <div class="history-reload-section" id="history-reload-section" style="display: none;">
+        <h3 class="history-title">📁 Recarregar análise do arquivo</h3>
+        
+        <div class="custom-dropdown-container">
+          <input type="text" id="history-search-input" class="dropdown-search-input" placeholder="🔍 Pesquisar no Histórico por nome..." autocomplete="off">
+          
+          <div class="dropdown-options" id="history-dropdown-options">
+            <!-- As opções serão preenchidas via JS -->
+            <div class="no-options">Carregando histórico...</div>
+          </div>
+        </div>
+        
+        <button class="btn btn-outline" id="load-history-btn" disabled style="width: 100%;">Carregar Histórico Selecionado</button>
+      </div>
     </section>
 
     <!-- DASHBOARD HISTÓRICO -->
