@@ -58,6 +58,78 @@ const historyReloadSection = document.getElementById('history-reload-section');
 const historySearchInput = document.getElementById('history-search-input');
 const historyDropdownOptions = document.getElementById('history-dropdown-options');
 const loadHistoryBtn = document.getElementById('load-history-btn');
+const sidebar = document.getElementById('sidebar');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const floatingToggle = document.getElementById('floating-toggle');
+
+// ===== SIDEBAR LOGIC =====
+function toggleSidebar() {
+  sidebar?.classList.toggle('collapsed');
+  const isCollapsed = sidebar?.classList.contains('collapsed');
+  localStorage.setItem('sidebarCollapsed', isCollapsed);
+}
+
+sidebarToggle?.addEventListener('click', toggleSidebar);
+floatingToggle?.addEventListener('click', toggleSidebar);
+
+// ===== VIEW MANAGEMENT =====
+const pipelineView = document.getElementById('pipeline-view');
+const analyticsView = document.getElementById('analytics-view');
+const analyticsTitle = document.getElementById('analytics-title');
+const analyticsContent = document.getElementById('analytics-content');
+const backToPipelineBtn = document.getElementById('btn-back-to-pipeline');
+const navItems = document.querySelectorAll('.nav-item');
+
+function switchView(viewName) {
+  // Update active nav item
+  navItems.forEach(item => {
+    item.classList.toggle('active', item.dataset.view === viewName);
+  });
+
+  if (viewName === 'pipeline') {
+    pipelineView.style.display = 'block';
+    analyticsView.style.display = 'none';
+  } else {
+    pipelineView.style.display = 'none';
+    analyticsView.style.display = 'block';
+    
+    // Update title and content based on sub-view
+    renderAnalyticsSubView(viewName);
+  }
+}
+
+async function renderAnalyticsSubView(viewName) {
+  const selectedMentoria = document.querySelector('input[name="mentoria"]:checked')?.value || 'cleiton';
+  const stats = await getHistoryStats(selectedMentoria);
+  const detailedStats = await getDetailedAnalytics(selectedMentoria);
+  
+  analyticsContent.innerHTML = '<div class="sidebar-loading">Carregando dados específicos...</div>';
+
+  const viewTitles = {
+    'history-general': 'Resumo Geral do Histórico',
+    'history-nicho': 'Dúvidas por Nicho',
+    'history-months': 'Insights Estratégicos Mensais',
+    'history-records': 'Registros Individuais'
+  };
+
+  analyticsTitle.textContent = viewTitles[viewName] || 'Estatísticas';
+  renderHistoryDashboard(stats, detailedStats, selectedMentoria, viewName);
+}
+
+navItems.forEach(item => {
+  item.addEventListener('click', () => {
+    switchView(item.dataset.view);
+  });
+});
+
+backToPipelineBtn?.addEventListener('click', () => {
+  switchView('pipeline');
+});
+
+// Restore sidebar state
+if (localStorage.getItem('sidebarCollapsed') === 'true') {
+  sidebar?.classList.add('collapsed');
+}
 
 // ===== UPLOAD HANDLING =====
 
@@ -659,30 +731,40 @@ loadHistoryBtn?.addEventListener('click', async () => {
   }
 });
 
-// Clear history button
-document.getElementById('clear-history-btn')?.addEventListener('click', async () => {
-  if (confirm('Tem certeza que deseja limpar todo o histórico de análises no Supabase?')) {
-    await clearHistory();
-    await refreshHistoryDashboard();
-  }
-});
+// Dashboard interaction containers
+const sidebarDashboard = document.getElementById('history-dashboard-sidebar');
+const analyticsDashboard = document.getElementById('analytics-content');
 
-// Delete individual record from history dashboard
-document.getElementById('history-dashboard')?.addEventListener('delete-record', async (e) => {
+// Delete individual record
+const handleDeleteRecord = async (e) => {
   const id = e.detail?.id;
   if (id) {
-    await removeFromHistory(id);
-    await refreshHistoryDashboard();
+    if (confirm('Tem certeza que deseja remover este registro permanentemente?')) {
+      await removeFromHistory(id);
+      await refreshHistoryDashboard();
+      
+      // Se estiver em uma sub-view, recarregar também a sub-view
+      const activeNav = document.querySelector('.nav-item.active');
+      if (activeNav && activeNav.dataset.view !== 'pipeline') {
+        renderAnalyticsSubView(activeNav.dataset.view);
+      }
+    }
   }
-});
+};
 
-// --- Filtros Interativos do Dashboard ---
-document.getElementById('history-dashboard')?.addEventListener('change', (e) => {
+sidebarDashboard?.addEventListener('delete-record', handleDeleteRecord);
+analyticsDashboard?.addEventListener('delete-record', handleDeleteRecord);
+
+// --- Filtros Interativos ---
+const handleFilterChange = (e) => {
   const target = e.target;
   if (target.id === 'filter-month' || target.id === 'filter-nicho' || target.id === 'filter-specialist') {
     applyHistoryFilters();
   }
-});
+};
+
+sidebarDashboard?.addEventListener('change', handleFilterChange);
+analyticsDashboard?.addEventListener('change', handleFilterChange);
 
 /**
  * Aplica filtros de Mês e Nicho na visualização atual do Dashboard
@@ -759,13 +841,16 @@ function applyHistoryFilters() {
 }
 
 // Lógica de Exportação Consolidada (DOCX)
-document.getElementById('history-dashboard')?.addEventListener('click', async (e) => {
+const handleExportConsolidated = async (e) => {
   const btn = e.target.closest('#btn-consolidated-export');
   if (!btn) return;
 
-  const month = document.getElementById('filter-month')?.value || 'all';
-  const niche = document.getElementById('filter-nicho')?.value || 'all';
-  const specialist = document.getElementById('filter-specialist')?.value || 'all';
+  const activeContainer = e.currentTarget;
+  const month = activeContainer.querySelector('#filter-month')?.value || 'all';
+  const niche = activeContainer.querySelector('#filter-nicho')?.value || 'all';
+  const specialist = activeContainer.querySelector('#filter-specialist')?.value || 'all';
+  
+  // ... resto da lógica de exportação ...
 
   if (month === 'all' && niche === 'all' && specialist === 'all') {
     alert('Por favor, selecione um Mês, Nicho ou Especialista específico para exportar o consolidado.');
@@ -813,9 +898,21 @@ document.getElementById('history-dashboard')?.addEventListener('click', async (e
     showError('Erro na exportação consolidada: ' + err.message);
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<span class="btn-icon-left">📄</span> Exportar Consolidado';
+    btn.innerHTML = `
+      <svg class="btn-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
+      Exportar Consolidado
+    `;
   }
-});
+};
+
+sidebarDashboard?.addEventListener('click', handleExportConsolidated);
+analyticsDashboard?.addEventListener('click', handleExportConsolidated);
 
 // Refresh history when switching mentoria
 document.querySelectorAll('input[name="mentoria"]').forEach(input => {

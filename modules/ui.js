@@ -659,12 +659,18 @@ function renderAgent3Dashboard(categorias, mentoriaType = 'cleiton') {
  * @param {Object} detailedStats - Insights do getDetailedAnalytics()
  * @param {string} mentoriaLabel - Label da mentoria ativa
  */
-export function renderHistoryDashboard(stats, detailedStats = {}, mentoriaLabel = 'Todas') {
-  const container = document.getElementById('history-dashboard');
-  if (!container) return;
+export function renderHistoryDashboard(stats, detailedStats = {}, mentoriaLabel = 'Todas', view = 'all') {
+  // Tentar primeiro o container da sidebar, depois o do main
+  const container = document.getElementById('history-dashboard-sidebar') || document.getElementById('history-dashboard');
+  
+  // Se for uma visualização específica no main-content
+  const analyticsContent = document.getElementById('analytics-content');
+  const targetContainer = (view !== 'all' && analyticsContent) ? analyticsContent : container;
+
+  if (!targetContainer) return;
 
   if (!stats || !stats.totalMentorados) {
-    container.innerHTML = `
+    targetContainer.innerHTML = `
       <div class="history-empty">
         <p>📊 Nenhuma análise registrada ainda.</p>
         <p style="font-size: 0.8rem; margin-top: 0.5rem;">Processe uma conversa para começar a acumular dados aqui.</p>
@@ -681,54 +687,68 @@ export function renderHistoryDashboard(stats, detailedStats = {}, mentoriaLabel 
   const uniqueNiches = [...new Set(Object.keys(stats.duvidaPorNicho))].sort();
   const uniqueSpecialists = [...new Set(Object.keys(stats.duvidaPorEspecialista || {}))].sort();
 
-  let html = `
-    <div class="history-controls">
-      <div class="filter-group">
-        <label>Período:</label>
-        <select id="filter-month">
-          <option value="all">Todos os Meses</option>
-          ${uniqueMonths.map(m => `<option value="${m}">${m}</option>`).join('')}
-        </select>
+  let html = '';
+
+  // Filtros (apenas na visão geral ou se requisitado)
+  if (view === 'all' || view === 'history-general') {
+    html += `
+      <div class="history-controls">
+        <div class="filter-group">
+          <label>Período:</label>
+          <select id="filter-month">
+            <option value="all">Todos os Meses</option>
+            ${uniqueMonths.map(m => `<option value="${m}">${m}</option>`).join('')}
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Nicho:</label>
+          <select id="filter-nicho">
+            <option value="all">Todos os Nichos</option>
+            ${uniqueNiches.map(n => `<option value="${n}">${n}</option>`).join('')}
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Especialista:</label>
+          <select id="filter-specialist">
+            <option value="all">Todos</option>
+            ${uniqueSpecialists.map(s => `<option value="${s}">${s}</option>`).join('')}
+          </select>
+        </div>
+        <button id="btn-consolidated-export" class="btn-elegant" style="margin-left: auto;">
+          <svg class="btn-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          Exportar Consolidado
+        </button>
       </div>
-      <div class="filter-group">
-        <label>Nicho:</label>
-        <select id="filter-nicho">
-          <option value="all">Todos os Nichos</option>
-          ${uniqueNiches.map(n => `<option value="${n}">${n}</option>`).join('')}
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>Especialista:</label>
-        <select id="filter-specialist">
-          <option value="all">Todos</option>
-          ${uniqueSpecialists.map(s => `<option value="${s}">${s}</option>`).join('')}
-        </select>
-      </div>
-      <button id="btn-consolidated-export" class="btn-secondary btn-small" style="margin-left: auto;">
-        <span class="btn-icon-left">📄</span> Exportar Consolidado
-      </button>
-    </div>
-  `;
+    `;
+  }
 
   // === Cards de Resumo principal (que serão atualizados via JS) ===
-  html += `
-    <div class="history-stats-grid" id="history-summary-cards">
-      <div class="history-stat-card">
-        <div class="history-stat-value" id="stat-total-mentorados">${stats.totalMentorados}</div>
-        <div class="history-stat-label">Mentorados</div>
+  if (view === 'all' || view === 'history-general') {
+    html += `
+      <div class="history-stats-grid" id="history-summary-cards">
+        <div class="history-stat-card">
+          <div class="history-stat-value" id="stat-total-mentorados">${stats.totalMentorados}</div>
+          <div class="history-stat-label">Mentorados</div>
+        </div>
+        <div class="history-stat-card">
+          <div class="history-stat-value" id="stat-total-duvidas">${stats.totalDuvidas}</div>
+          <div class="history-stat-label">Total de Dúvidas</div>
+        </div>
       </div>
-      <div class="history-stat-card">
-        <div class="history-stat-value" id="stat-total-duvidas">${stats.totalDuvidas}</div>
-        <div class="history-stat-label">Total de Dúvidas</div>
-      </div>
-    </div>
-  `;
+    `;
+  }
 
   // === Dúvidas por Nicho ===
   const nichoEntries = Object.entries(stats.duvidaPorNicho)
     .sort((a, b) => b[1] - a[1]);
 
-  if (nichoEntries.length > 0) {
+  if ((view === 'all' || view === 'history-nicho') && nichoEntries.length > 0) {
     html += `
       <div class="history-nicho-section">
         <h3>Dúvidas por Nicho</h3>
@@ -755,7 +775,7 @@ export function renderHistoryDashboard(stats, detailedStats = {}, mentoriaLabel 
       return (yb + mb).localeCompare(ya + ma);
     });
 
-  if (monthEntries.length > 0) {
+  if ((view === 'all' || view === 'history-general') && monthEntries.length > 0) {
     html += `
       <div class="history-monthly-section">
         <h3>Dúvidas por Mês</h3>
@@ -784,7 +804,7 @@ export function renderHistoryDashboard(stats, detailedStats = {}, mentoriaLabel 
 
   // === Insights Detalhados (Nicho -> Mês -> Categorias) ===
   const nichoDetails = Object.entries(detailedStats).sort();
-  if (nichoDetails.length > 0) {
+  if ((view === 'all' || view === 'history-months') && nichoDetails.length > 0) {
     html += `
       <div class="history-insights-section">
         <h3>💡 Insights Estratégicos</h3>
@@ -839,7 +859,7 @@ export function renderHistoryDashboard(stats, detailedStats = {}, mentoriaLabel 
   }
 
   // === Lista de Registros ===
-  if (stats.registros.length > 0) {
+  if ((view === 'all' || view === 'history-records') && stats.registros.length > 0) {
     html += `
       <div class="history-records-section">
         <h3>Registros Individuais</h3>
@@ -860,16 +880,16 @@ export function renderHistoryDashboard(stats, detailedStats = {}, mentoriaLabel 
     html += '</div>';
   }
 
-  container.innerHTML = html;
+  targetContainer.innerHTML = html;
 
   // Event listeners para deletar registros
-  container.querySelectorAll('.history-record-delete').forEach(btn => {
+  targetContainer.querySelectorAll('.history-record-delete').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const id = btn.dataset.deleteId;
       if (id) {
         // Dispatch custom event to be handled by main.js
-        container.dispatchEvent(new CustomEvent('delete-record', { detail: { id } }));
+        targetContainer.dispatchEvent(new CustomEvent('delete-record', { detail: { id } }));
       }
     });
   });
