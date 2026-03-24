@@ -119,7 +119,7 @@ export function executeAgent2(messages, transcriptions, mediaFiles, onProgress =
         hora: msg.hora,
         remetente: msg.remetente,
         tipo: 'apagada',
-        conteudo: '❌ Mensagem apagada',
+        conteudo: '[ Mensagem apagada ]',
         transcricao: null,
         conteudo_extraido: null
       });
@@ -136,7 +136,7 @@ export function executeAgent2(messages, transcriptions, mediaFiles, onProgress =
           hora: msg.hora,
           remetente: msg.remetente,
           tipo: 'audio',
-          conteudo: `🎧 Áudio`,
+          conteudo: `[ Áudio ]`,
           transcricao: transcription.transcricao,
           conteudo_extraido: null,
           audio_id: transcription.audio_id
@@ -147,7 +147,7 @@ export function executeAgent2(messages, transcriptions, mediaFiles, onProgress =
           hora: msg.hora,
           remetente: msg.remetente,
           tipo: 'audio',
-          conteudo: '🎧 Áudio',
+          conteudo: '[ Áudio ]',
           transcricao: '[ERRO: Áudio não encontrado no ZIP]',
           conteudo_extraido: null
         });
@@ -164,7 +164,7 @@ export function executeAgent2(messages, transcriptions, mediaFiles, onProgress =
           hora: msg.hora,
           remetente: msg.remetente,
           tipo: 'imagem_print',
-          conteudo: '📷 Imagem (print de conversa)',
+          conteudo: '[ Imagem - Print de conversa ]',
           transcricao: null,
           conteudo_extraido: `[CONTEÚDO EXTRAÍDO DA IMAGEM]\n${msg.mediaFilename}`,
           mediaFilename: msg.mediaFilename
@@ -176,7 +176,7 @@ export function executeAgent2(messages, transcriptions, mediaFiles, onProgress =
           hora: msg.hora,
           remetente: msg.remetente,
           tipo: 'imagem_comum',
-          conteudo: '📷 Imagem enviada',
+          conteudo: '[ Imagem enviada ]',
           transcricao: null,
           conteudo_extraido: null,
           mediaFilename: msg.mediaFilename
@@ -192,7 +192,7 @@ export function executeAgent2(messages, transcriptions, mediaFiles, onProgress =
         hora: msg.hora,
         remetente: msg.remetente,
         tipo: 'video',
-        conteudo: '🎥 Vídeo enviado',
+        conteudo: '[ Vídeo enviado ]',
         transcricao: null,
         conteudo_extraido: null
       });
@@ -206,7 +206,7 @@ export function executeAgent2(messages, transcriptions, mediaFiles, onProgress =
         hora: msg.hora,
         remetente: msg.remetente,
         tipo: 'documento',
-        conteudo: `📄 Documento enviado${msg.mediaFilename ? ': ' + msg.mediaFilename : ''}`,
+        conteudo: `[ Documento enviado${msg.mediaFilename ? ': ' + msg.mediaFilename : ''} ]`,
         transcricao: null,
         conteudo_extraido: null
       });

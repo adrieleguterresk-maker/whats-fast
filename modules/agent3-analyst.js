@@ -44,9 +44,9 @@ const SMALLTALK_PATTERNS = [
   // Stickers / figurinhas
   /^(sticker omitted|figurinha omitida|figurinha)$/i,
   // Áudio sem transcrição
-  /^🎧\s*áudio$/i,
+  /^\[ Áudio \]$/i,
   // Imagem/Video/Documento sem conteúdo
-  /^(📷|🎥|📄)\s/i,
+  /^\[ (Imagem|Vídeo|Documento)/i,
 ];
 
 /**

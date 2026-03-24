@@ -24,7 +24,7 @@
           <span class="sidebar-logo-text">Histórico</span>
         </div>
         <div class="sidebar-header-actions">
-           <button id="sidebar-toggle" class="sidebar-toggle-btn" title="Recolher Sidebar">
+           <button id="sidebar-toggle" class="sidebar-toggle-btn">
              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/>
              </svg>
@@ -36,24 +36,18 @@
         <!-- MENU DE NAVEGAÇÃO -->
         <nav class="sidebar-nav">
           <button class="nav-item active" data-view="pipeline">
-            <span class="nav-icon">🚀</span>
             <span class="nav-label">Analisar Agora</span>
           </button>
-          <div class="nav-divider">HISTÓRICO & INSIGHTS</div>
           <button class="nav-item" data-view="history-general">
-            <span class="nav-icon">📊</span>
             <span class="nav-label">Geral (Resumo)</span>
           </button>
           <button class="nav-item" data-view="history-nicho">
-            <span class="nav-icon">🎯</span>
             <span class="nav-label">Dúvidas por Nicho</span>
           </button>
           <button class="nav-item" data-view="history-months">
-            <span class="nav-icon">📅</span>
             <span class="nav-label">Insights Mensais</span>
           </button>
           <button class="nav-item" data-view="history-records">
-            <span class="nav-icon">👥</span>
             <span class="nav-label">Registros Individuais</span>
           </button>
         </nav>
@@ -83,53 +77,32 @@
         <!-- HEADER -->
       <header class="header" id="header">
         <div class="header-content">
-          <div class="logo">
-            <div class="logo-icon">
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/>
-                <path d="M10 16.5L14 20.5L22 12.5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            <div>
-              <h1>WhatsApp Analyzer</h1>
-              <p class="subtitle">Pipeline de Inteligência em 3 Agentes</p>
-            </div>
-          </div>
+
           <div class="header-actions">
             <!-- SELETOR DE MENTORIA PREMIUM -->
-            <div class="mentoria-selector">
-              <div class="mentoria-slider"></div>
-              <label class="mentoria-option">
-                <input type="radio" name="mentoria" value="cleiton" checked>
-                <span class="mentoria-btn">Mentoria Cleiton</span>
-              </label>
-              <label class="mentoria-option" style="right: 0;">
-                <input type="radio" name="mentoria" value="julia">
-                <span class="mentoria-btn">Mentoria Julia</span>
-              </label>
+            <div class="custom-select-wrapper" id="mentoria-wrapper">
+              <input type="hidden" id="filter-mentoria" value="cleiton">
+              <div class="custom-select-trigger" id="mentoria-trigger">
+                <span id="mentoria-selected-text">Mentoria Cleiton</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </div>
+              <div class="custom-select-options" id="mentoria-options">
+                <div class="custom-option selected" data-value="cleiton">Mentoria Cleiton</div>
+                <div class="custom-option" data-value="julia">Mentoria Julia</div>
+              </div>
             </div>
           </div>
         </div>
       </header>
 
       <!-- UPLOAD AREA -->
-      <section class="upload-section" id="upload-section">
-        <div class="input-row" style="display: flex; gap: 1rem; margin-bottom: 2rem;">
-          <div class="nicho-field" id="nicho-field" style="flex: 1; margin-bottom: 0;">
-            <label for="nicho-input">Nicho do Mentorado</label>
-            <input type="text" id="nicho-input" placeholder="Ex: Dentista, Esteticista..." autocomplete="off">
-          </div>
-          <div class="nicho-field" id="specialist-field" style="flex: 1; margin-bottom: 0;">
-            <label for="specialist-input">Especialista (Mentor)</label>
-            <input type="text" id="specialist-input" placeholder="Ex: Cleiton, Ádila..." autocomplete="off">
-          </div>
-        </div>
-
-
-        <div class="file-upload-wrapper" id="drop-zone">
+      <section class="upload-section grid-upload-layout" id="upload-section">
+        
+        <!-- COLUNA ESQUERDA: UPLOAD -->
+        <div class="file-upload-wrapper" id="drop-zone" style="flex: 2;">
           <input type="file" id="file-upload" accept=".zip" class="file-input" />
           <div class="upload-icon">
-            <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+            <svg width="42" height="42" viewBox="0 0 64 64" fill="none">
               <path d="M32 8L32 44" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
               <path d="M20 20L32 8L44 20" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M8 40V52C8 54.2091 9.79086 56 12 56H52C54.2091 56 56 54.2091 56 52V40" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
@@ -143,31 +116,30 @@
           </label>
           <input type="file" id="file-input" accept=".zip,.txt" hidden>
         </div>
-        <div class="upload-summary" id="upload-summary"></div>
 
-        <!-- Recarregar Histórico do Supabase -->
-        <div class="history-reload-section" id="history-reload-section" style="display: none;">
-          <h3 class="history-title">📁 Recarregar análise do arquivo</h3>
-          
-          <div class="custom-dropdown-container">
-            <input type="text" id="history-search-input" class="dropdown-search-input" placeholder="🔍 Pesquisar no Histórico por nome..." autocomplete="off">
-            
-            <div class="dropdown-options" id="history-dropdown-options">
-              <!-- As opções serão preenchidas via JS -->
-              <div class="no-options">Carregando histórico...</div>
-            </div>
+        <!-- COLUNA DIREITA: INPUTS -->
+        <div class="input-col" style="flex: 1; display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
+          <div class="nicho-field" id="nicho-field">
+            <label for="nicho-input">Nicho do Mentorado</label>
+            <input type="text" id="nicho-input" placeholder="Ex: Dentista, Esteticista..." autocomplete="off">
           </div>
-          
-          <button class="btn btn-outline" id="load-history-btn" disabled style="width: 100%;">Carregar Histórico Selecionado</button>
+          <div class="nicho-field" id="specialist-field">
+            <label for="specialist-input">Especialista (Mentor)</label>
+            <input type="text" id="specialist-input" placeholder="Ex: Cleiton, Ádila..." autocomplete="off">
+          </div>
         </div>
+
+        <div class="upload-summary" id="upload-summary" style="grid-column: 1 / -1;"></div>
+
+
       </section>
 
-      <!-- DASHBOARD HISTÓRICO NO MAIN (Oculto se preferir manter só na sidebar) -->
+      <!-- DASHBOARD HISTÓRICO NO MAIN -->
       <section class="history-section" id="history-section" style="display: none;">
         <div class="history-header">
-          <h2 class="section-title">📊 Histórico de Análises</h2>
+          <h2 class="section-title">Histórico de Análises</h2>
           <div class="history-actions">
-            <button class="btn btn-sm btn-outline" id="clear-history-btn" title="Limpar histórico">🗑️ Limpar</button>
+            <button class="btn btn-sm btn-outline" id="clear-history-btn" title="Limpar histórico">Limpar</button>
           </div>
         </div>
         <div id="history-dashboard"></div>
@@ -340,6 +312,23 @@
             </div>
           </div>
         </div>
+      </section>
+
+        <!-- Recarregar Histórico do Supabase -->
+        <div class="history-reload-section" id="history-reload-section">
+          <h3 class="history-title">Recarregar análise do arquivo</h3>
+          
+          <div class="custom-dropdown-container">
+            <input type="text" id="history-search-input" class="dropdown-search-input" placeholder="Pesquisar no Histórico por nome..." autocomplete="off">
+            
+            <div class="dropdown-options" id="history-dropdown-options">
+              <!-- As opções serão preenchidas via JS -->
+              <div class="no-options">Carregando histórico...</div>
+            </div>
+          </div>
+          
+          <button class="btn btn-outline" id="load-history-btn" disabled style="width: 100%;">Carregar Histórico Selecionado</button>
+        </div>
       </div><!-- Fim pipeline-view -->
 
       <!-- FOOTER -->
@@ -348,9 +337,11 @@
       </footer>
     </main>
 
-    <button id="floating-toggle" class="floating-toggle" title="Expandir Sidebar">
+    <button id="floating-toggle" class="floating-toggle">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
       </svg>
     </button>
   </div>

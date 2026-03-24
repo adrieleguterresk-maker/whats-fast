@@ -99,7 +99,7 @@ function switchView(viewName) {
 }
 
 async function renderAnalyticsSubView(viewName) {
-  const selectedMentoria = document.querySelector('input[name="mentoria"]:checked')?.value || 'cleiton';
+  const selectedMentoria = document.getElementById('filter-mentoria')?.value || 'cleiton';
   const stats = await getHistoryStats(selectedMentoria);
   const detailedStats = await getDetailedAnalytics(selectedMentoria);
   
@@ -337,7 +337,7 @@ async function runPipeline() {
   if (resetBtn) resetBtn.style.display = 'inline-flex';
 
   // Capturar mentoria selecionada no momento do início
-  const selectedMentoria = document.querySelector('input[name="mentoria"]:checked')?.value || 'cleiton';
+  const selectedMentoria = document.getElementById('filter-mentoria')?.value || 'cleiton';
   appState.mentoriaType = selectedMentoria;
 
   const { messages, mediaFiles } = appState.parseResult;
@@ -511,7 +511,7 @@ function resetApp() {
     agent2Output: null,
     agent3Output: null,
     isProcessing: false,
-    mentoriaType: document.querySelector('input[name="mentoria"]:checked')?.value || 'cleiton'
+    mentoriaType: document.getElementById('filter-mentoria')?.value || 'cleiton'
   };
 
   // Reset upload
@@ -600,7 +600,7 @@ function showError(message) {
 // ===== HISTORY DASHBOARD =====
 
 async function refreshHistoryDashboard() {
-  const selectedMentoria = document.querySelector('input[name="mentoria"]:checked')?.value || 'cleiton';
+  const selectedMentoria = document.getElementById('filter-mentoria')?.value || 'cleiton';
   const stats = await getHistoryStats(selectedMentoria);
   const detailedStats = await getDetailedAnalytics(selectedMentoria);
   renderHistoryDashboard(stats, detailedStats, selectedMentoria);
@@ -615,7 +615,8 @@ function updateHistoryDropdown(registros) {
   appState.historyRecords = registros || [];
   
   if (registros.length === 0) {
-    historyReloadSection.style.display = 'none';
+    historyReloadSection.style.display = 'block';
+    renderHistoryOptions([]);
     return;
   }
   
@@ -915,10 +916,53 @@ sidebarDashboard?.addEventListener('click', handleExportConsolidated);
 analyticsDashboard?.addEventListener('click', handleExportConsolidated);
 
 // Refresh history when switching mentoria
-document.querySelectorAll('input[name="mentoria"]').forEach(input => {
-  input.addEventListener('change', () => {
+const mentoriaSelect = document.getElementById('filter-mentoria');
+if (mentoriaSelect) {
+  mentoriaSelect.addEventListener('change', () => {
     refreshHistoryDashboard();
   });
+}
+
+// Global Custom Select Delegate (Dropdowns Premium)
+document.addEventListener('click', (e) => {
+  // 1. Click out / Click in trigger
+  const trigger = e.target.closest('.custom-select-trigger');
+  if (trigger) {
+    e.stopPropagation();
+    const wrapper = trigger.closest('.custom-select-wrapper');
+    // Fechar outros abertos
+    document.querySelectorAll('.custom-select-wrapper.open').forEach(w => {
+      if (w !== wrapper) w.classList.remove('open');
+    });
+    wrapper.classList.toggle('open');
+    return;
+  }
+
+  // 2. Click num Option
+  const option = e.target.closest('.custom-option');
+  if (option) {
+    e.stopPropagation();
+    const wrapper = option.closest('.custom-select-wrapper');
+    wrapper.querySelectorAll('.custom-option').forEach(o => o.classList.remove('selected'));
+    option.classList.add('selected');
+    
+    // Atualiza input oculto e texto principal
+    const hiddenInput = wrapper.querySelector('input[type="hidden"]');
+    const triggerText = wrapper.querySelector('.custom-select-trigger span');
+    if (hiddenInput) hiddenInput.value = option.getAttribute('data-value');
+    if (triggerText) triggerText.textContent = option.textContent;
+    
+    wrapper.classList.remove('open');
+    
+    // Dispara a cadeia de eventos (change) para o main.js pegar automaticamente
+    if (hiddenInput) {
+      hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    return;
+  }
+
+  // 3. Click fora de qualquer wrapper fecha
+  document.querySelectorAll('.custom-select-wrapper.open').forEach(w => w.classList.remove('open'));
 });
 
 // Renderizar dashboard histórico na inicialização (Supabase)

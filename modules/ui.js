@@ -83,7 +83,7 @@ export function renderAgent1Results(transcriptions) {
 
   let html = `
     <div class="results-header">
-      <h3>📝 Transcrições de Áudio</h3>
+      <h3>Transcrições de Áudio</h3>
       <span class="badge">${transcriptions.length} áudio(s)</span>
     </div>
     <div class="results-table-wrap">
@@ -131,7 +131,7 @@ export function renderAgent2Results(conversation, mediaFiles = new Map()) {
   if (conversation.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <span class="empty-icon">📋</span>
+        <span class="empty-icon" style="font-weight: 300; font-family: monospace;">[ WAIT ]</span>
         <p>Nenhuma mensagem processada</p>
       </div>
     `;
@@ -151,7 +151,7 @@ export function renderAgent2Results(conversation, mediaFiles = new Map()) {
 
   let html = `
     <div class="results-header">
-      <h3>🔗 Conversa Unificada</h3>
+      <h3>Conversa Unificada</h3>
       <div class="stats-row">
         <span class="badge badge-text">${stats.texto} texto</span>
         <span class="badge badge-audio">${stats.audio} áudio</span>
@@ -250,7 +250,7 @@ export function renderAgent3Results(result, mediaFiles = new Map(), mentoriaType
   if (qaList.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <span class="empty-icon">❓</span>
+        <span class="empty-icon" style="font-weight: 300; font-family: monospace;">[ WAIT ]</span>
         <p>Nenhuma pergunta e resposta identificada</p>
       </div>
     `;
@@ -374,7 +374,7 @@ export function renderUploadSummary(parseResult) {
         <div class="summary-label">Texto</div>
       </div>
     </div>
-    <div class="summary-file">📄 ${escapeHtml(chatFileName)}</div>
+    <div class="summary-file">${escapeHtml(chatFileName)}</div>
   `;
   container.classList.add('visible');
 }
@@ -548,17 +548,17 @@ function downloadBlob(blob, filename) {
 
 function getTypeIcon(tipo) {
   const icons = {
-    texto: '💬',
-    audio: '🎧',
-    imagem_print: '📸',
-    imagem_comum: '📷',
-    video: '🎥',
-    documento: '📄',
-    apagada: '❌',
-    media_omitida: '📎',
-    sistema: '⚙️'
+    texto: 'TXT',
+    audio: 'VOL',
+    imagem_print: 'IMG',
+    imagem_comum: 'IMG',
+    video: 'VID',
+    documento: 'DOC',
+    apagada: 'DEL',
+    media_omitida: 'MDIA',
+    sistema: 'SYS'
   };
-  return icons[tipo] || '📝';
+  return icons[tipo] || 'MSG';
 }
 
 function getTypeClass(tipo) {
@@ -590,7 +590,7 @@ function renderMediaButtons(filenames, mediaFiles) {
     const imageUrl = URL.createObjectURL(media.blob);
     html += `
       <button class="qa-image-btn" onclick="window.openImageModal('${imageUrl}')" title="Ver imagem anexada">
-        📷 Ver Imagem
+        Ver Imagem
       </button>
     `;
   }
@@ -604,15 +604,15 @@ function renderAgent3Dashboard(categorias, mentoriaType = 'cleiton') {
   if (!categorias) return '';
 
   const icons = {
-    'Marketing': '🎯',
-    'Comercial': '💰',
-    'Sucesso do Cliente': '⭐',
-    'Mentalidade': '🧠',
-    'Identidade Visual': '✨',
-    'Produção de Conteúdo': '📱',
-    'Contratação': '👥',
-    'Acesso': '🔑',
-    'Gestão': '⚙️'
+    'Marketing': 'MKT',
+    'Comercial': 'VND',
+    'Sucesso do Cliente': 'CS',
+    'Mentalidade': 'MND',
+    'Identidade Visual': 'IDV',
+    'Produção de Conteúdo': 'CNT',
+    'Contratação': 'RH',
+    'Acesso': 'ACS',
+    'Gestão': 'GST'
   };
 
   // Pilares de cada mentoria
@@ -639,7 +639,7 @@ function renderAgent3Dashboard(categorias, mentoriaType = 'cleiton') {
   
   activeCategories.forEach(cat => {
     const count = categorias[cat];
-    const icon = icons[cat] || '📋';
+    const icon = icons[cat] || 'CAT';
     html += `
       <div class="indicator-card">
         <div class="indicator-icon">${icon}</div>
@@ -672,7 +672,7 @@ export function renderHistoryDashboard(stats, detailedStats = {}, mentoriaLabel 
   if (!stats || !stats.totalMentorados) {
     targetContainer.innerHTML = `
       <div class="history-empty">
-        <p>📊 Nenhuma análise registrada ainda.</p>
+        <p>Nenhuma análise registrada ainda.</p>
         <p style="font-size: 0.8rem; margin-top: 0.5rem;">Processe uma conversa para começar a acumular dados aqui.</p>
       </div>
     `;
@@ -687,6 +687,21 @@ export function renderHistoryDashboard(stats, detailedStats = {}, mentoriaLabel 
   const uniqueNiches = [...new Set(Object.keys(stats.duvidaPorNicho))].sort();
   const uniqueSpecialists = [...new Set(Object.keys(stats.duvidaPorEspecialista || {}))].sort();
 
+  // Helper para select
+  const renderCustomSelect = (id, options, defaultLabel) => `
+    <div class="custom-select-wrapper" id="${id}-wrapper">
+      <input type="hidden" id="${id}" value="all" class="history-hidden-select">
+      <div class="custom-select-trigger" data-for="${id}">
+        <span id="${id}-selected-text">${defaultLabel}</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </div>
+      <div class="custom-select-options dyn-options">
+        <div class="custom-option selected" data-value="all">${defaultLabel}</div>
+        ${options.map(opt => `<div class="custom-option" data-value="${opt}">${opt}</div>`).join('')}
+      </div>
+    </div>
+  `;
+
   let html = '';
 
   // Filtros (apenas na visão geral ou se requisitado)
@@ -695,24 +710,15 @@ export function renderHistoryDashboard(stats, detailedStats = {}, mentoriaLabel 
       <div class="history-controls">
         <div class="filter-group">
           <label>Período:</label>
-          <select id="filter-month">
-            <option value="all">Todos os Meses</option>
-            ${uniqueMonths.map(m => `<option value="${m}">${m}</option>`).join('')}
-          </select>
+          ${renderCustomSelect('filter-month', uniqueMonths, 'Todos os Meses')}
         </div>
         <div class="filter-group">
           <label>Nicho:</label>
-          <select id="filter-nicho">
-            <option value="all">Todos os Nichos</option>
-            ${uniqueNiches.map(n => `<option value="${n}">${n}</option>`).join('')}
-          </select>
+          ${renderCustomSelect('filter-nicho', uniqueNiches, 'Todos os Nichos')}
         </div>
         <div class="filter-group">
           <label>Especialista:</label>
-          <select id="filter-specialist">
-            <option value="all">Todos</option>
-            ${uniqueSpecialists.map(s => `<option value="${s}">${s}</option>`).join('')}
-          </select>
+          ${renderCustomSelect('filter-specialist', uniqueSpecialists, 'Todos')}
         </div>
         <button id="btn-consolidated-export" class="btn-elegant" style="margin-left: auto;">
           <svg class="btn-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -807,7 +813,7 @@ export function renderHistoryDashboard(stats, detailedStats = {}, mentoriaLabel 
   if ((view === 'all' || view === 'history-months') && nichoDetails.length > 0) {
     html += `
       <div class="history-insights-section">
-        <h3>💡 Insights Estratégicos</h3>
+        <h3>Insights Estratégicos</h3>
         <p style="font-size: 0.8rem; color: var(--text-tertiary); margin-bottom: 1rem;">Tendências de dúvidas por nicho e período.</p>
         <div class="insights-container">
     `;
